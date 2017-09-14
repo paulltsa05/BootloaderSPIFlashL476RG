@@ -58,13 +58,18 @@ _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
 /* Specify the memory areas */
-MEMORY
+/*MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 96K
 RAM2 (xrw)      : ORIGIN = 0x10000000, LENGTH = 32K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 1024K
+FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
+}*/
+MEMORY
+{
+RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 64K
+RAM2 (xrw)      : ORIGIN = 0x10000000, LENGTH = 0K
+FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 32K 
 }
-
 /* Define output sections */
 SECTIONS
 {
@@ -154,7 +159,8 @@ SECTIONS
     _sdata = .;        /* create a global symbol at data start */
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
-
+    *(.RamFunc)        /* added by Paul */
+    *(.RamFunc.*)	
     . = ALIGN(8);
     _edata = .;        /* define a global symbol at data end */
   } >RAM AT> FLASH
@@ -170,8 +176,8 @@ SECTIONS
     *(.bss)
     *(.bss*)
     *(COMMON)
-
     . = ALIGN(4);
+
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
   } >RAM

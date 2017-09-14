@@ -106,6 +106,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32l4xx_hal.h"
+#include "main.h"
 
 /** @addtogroup STM32L4xx_HAL_Driver
   * @{
@@ -179,7 +180,8 @@ static void          FLASH_Program_Fast(uint32_t Address, uint32_t DataAddress);
   * 
   * @retval HAL_StatusTypeDef HAL Status
   */
-HAL_StatusTypeDef HAL_FLASH_Program(uint32_t TypeProgram, uint32_t Address, uint64_t Data)
+//HAL_StatusTypeDef HAL_FLASH_Program(uint32_t TypeProgram, uint32_t Address, uint64_t Data)
+__RAM_FUNC HAL_FLASH_Program(uint32_t TypeProgram, uint32_t Address, uint64_t Data)
 {
   HAL_StatusTypeDef status = HAL_ERROR;
   uint32_t prog_bit = 0;
@@ -192,7 +194,7 @@ HAL_StatusTypeDef HAL_FLASH_Program(uint32_t TypeProgram, uint32_t Address, uint
 
   /* Wait for last operation to be completed */
   status = FLASH_WaitForLastOperation((uint32_t)FLASH_TIMEOUT_VALUE);
-  
+  //PRINTF("\n\rWrite Perform @0x%08X !!! Error Code = %d",Address, status );
   if(status == HAL_OK)
   {
     pFlash.ErrorCode = HAL_FLASH_ERROR_NONE;

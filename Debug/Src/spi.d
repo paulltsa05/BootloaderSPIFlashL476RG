@@ -28,6 +28,8 @@ Src/spi.o: ../Src/spi.c \
  D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_pwr_ex.h \
  D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_spi.h \
  D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_spi_ex.h \
+ D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h \
+ D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart_ex.h \
  D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc/gpio.h
 
 D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc/spi.h:
@@ -87,5 +89,9 @@ D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx
 D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_spi.h:
 
 D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_spi_ex.h:
+
+D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h:
+
+D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart_ex.h:
 
 D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc/gpio.h:

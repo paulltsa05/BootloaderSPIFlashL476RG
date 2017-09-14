@@ -1,14 +1,16 @@
 /**
   ******************************************************************************
-  * @file    stm32l4xx_hal_flash_ex.h
-  * @author  MCD Application Team
-  * @version V1.7.2 
-  * @date    16-June-2017
-  * @brief   Header file of FLASH HAL Extended module.
+  * File Name          : USART.h
+  * Description        : This file provides code for the configuration
+  *                      of the USART instances.
   ******************************************************************************
-  * @attention
+  ** This notice applies to any and all portions of this file
+  * that are not between comment pairs USER CODE BEGIN and
+  * USER CODE END. Other portions of this file, whether 
+  * inserted by the user or by software development tools
+  * are owned by their respective copyright owners.
   *
-  * <h2><center>&copy; COPYRIGHT(c) 2017 STMicroelectronics</center></h2>
+  * COPYRIGHT(c) 2017 STMicroelectronics
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -34,65 +36,46 @@
   *
   ******************************************************************************
   */
-
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32L4xx_HAL_FLASH_EX_H
-#define __STM32L4xx_HAL_FLASH_EX_H
-
+#ifndef __usart_H
+#define __usart_H
 #ifdef __cplusplus
  extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32l4xx_hal_def.h"
+#include "stm32l4xx_hal.h"
+#include "main.h"
 
-/** @addtogroup STM32L4xx_HAL_Driver
-  * @{
-  */
+/* USER CODE BEGIN Includes */
 
-/** @addtogroup FLASHEx
-  * @{
-  */ 
+/* USER CODE END Includes */
 
-/* Exported types ------------------------------------------------------------*/
+extern UART_HandleTypeDef huart2;
 
-/* Exported constants --------------------------------------------------------*/
+/* USER CODE BEGIN Private defines */
 
-/* Exported macro ------------------------------------------------------------*/
+/* USER CODE END Private defines */
 
-/* Exported functions --------------------------------------------------------*/ 
-/** @addtogroup FLASHEx_Exported_Functions
-  * @{
-  */
+extern void _Error_Handler(char *, int);
 
-/* Extended Program operation functions  *************************************/
-/** @addtogroup FLASHEx_Exported_Functions_Group1
-  * @{
-  */
- __RAM_FUNC HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t *PageError);
-HAL_StatusTypeDef HAL_FLASHEx_Erase_IT(FLASH_EraseInitTypeDef *pEraseInit);
-HAL_StatusTypeDef HAL_FLASHEx_OBProgram(FLASH_OBProgramInitTypeDef *pOBInit);
-void              HAL_FLASHEx_OBGetConfig(FLASH_OBProgramInitTypeDef *pOBInit);
-/**
-  * @}
-  */ 
+void MX_USART2_UART_Init(void);
 
-/**
-  * @}
-  */ 
+/* USER CODE BEGIN Prototypes */
 
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */ 
+/* USER CODE END Prototypes */
 
 #ifdef __cplusplus
 }
 #endif
+#endif /*__ usart_H */
 
-#endif /* __STM32L4xx_HAL_FLASH_EX_H */
+/**
+  * @}
+  */
+
+/**
+  * @}
+  */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

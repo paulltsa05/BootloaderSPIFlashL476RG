@@ -31,8 +31,11 @@ endif
 # All Target
 all: BootloaderL476RG.elf
 
+dependents:
+	-cd D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Release && $(MAKE) all
+
 # Tool invocations
-BootloaderL476RG.elf: $(OBJS) $(USER_OBJS)
+BootloaderL476RG.elf: $(OBJS) $(USER_OBJS) D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Release/BootloaderL476RG.elf
 	@echo 'Building target: $@'
 	@echo 'Invoking: MCU GCC Linker'
 	arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -specs=nosys.specs -specs=nano.specs -T"../STM32L476RGTx_FLASH.ld" -Wl,-Map=output.map -Wl,--gc-sections -lm -o "BootloaderL476RG.elf" @"objects.list" $(USER_OBJS) $(LIBS)
@@ -53,5 +56,6 @@ post-build:
 
 .PHONY: all clean dependents
 .SECONDARY: post-build
+D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Release/BootloaderL476RG.elf:
 
 -include ../makefile.targets

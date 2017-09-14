@@ -41,7 +41,8 @@
   /* Includes ------------------------------------------------------------------*/
 
 /* USER CODE BEGIN Includes */
-
+#include <stdint.h>
+#include <stdarg.h>
 /* USER CODE END Includes */
 
 /* Private define ------------------------------------------------------------*/
@@ -54,7 +55,7 @@
 #define USART_RX_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
-#define SPI2_CS_PIN_Pin GPIO_PIN_12
+#define SPI2_CS_PIN_Pin GPIO_PIN_15
 #define SPI2_CS_PIN_GPIO_Port GPIOB
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
@@ -64,7 +65,18 @@
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define UART_VCOM_PORT huart2 // Handle porting to your configure UART port handler
+#define BUFSIZE 64
 
+#if 1
+#define PRINTF(...)     vcom_Send(__VA_ARGS__)
+#else
+#define PRINTF(...)
+#endif
+extern void vcom_Send( char *format, ... );
+
+static uint16_t iw;
+static char buff[BUFSIZE+16];
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);

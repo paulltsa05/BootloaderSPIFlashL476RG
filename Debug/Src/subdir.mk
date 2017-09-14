@@ -9,7 +9,8 @@ C_SRCS += \
 ../Src/spi.c \
 ../Src/stm32l4xx_hal_msp.c \
 ../Src/stm32l4xx_it.c \
-../Src/system_stm32l4xx.c 
+../Src/system_stm32l4xx.c \
+../Src/usart.c 
 
 OBJS += \
 ./Src/gpio.o \
@@ -17,7 +18,8 @@ OBJS += \
 ./Src/spi.o \
 ./Src/stm32l4xx_hal_msp.o \
 ./Src/stm32l4xx_it.o \
-./Src/system_stm32l4xx.o 
+./Src/system_stm32l4xx.o \
+./Src/usart.o 
 
 C_DEPS += \
 ./Src/gpio.d \
@@ -25,7 +27,8 @@ C_DEPS += \
 ./Src/spi.d \
 ./Src/stm32l4xx_hal_msp.d \
 ./Src/stm32l4xx_it.d \
-./Src/system_stm32l4xx.d 
+./Src/system_stm32l4xx.d \
+./Src/usart.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -33,7 +36,7 @@ Src/%.o: ../Src/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: MCU GCC Compiler'
 	@echo %cd%
-	arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -D__weak=__attribute__((weak)) -D__packed=__attribute__((__packed__)) -DUSE_HAL_DRIVER -DSTM32L476xx -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/SPIFlashDriver" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/Legacy" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/CMSIS/Device/ST/STM32L4xx/Include" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/CMSIS/Include" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc"  -Og -g3 -Wall -fmessage-length=0 -ffunction-sections -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
+	arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -D__weak=__attribute__((weak)) -D__packed=__attribute__((__packed__)) -DUSE_HAL_DRIVER -DSTM32L476xx -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/SPIFlashDriver" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/STM32L4xx_HAL_Driver/Inc/Legacy" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/CMSIS/Device/ST/STM32L4xx/Include" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Drivers/CMSIS/Include" -I"D:/BackUp/KVTS/Bootloader_VTS/TestSTM32L476RG/BootloaderL476RG/Inc"  -Og -g3 -Wall -fmessage-length=0 -v -ffunction-sections -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

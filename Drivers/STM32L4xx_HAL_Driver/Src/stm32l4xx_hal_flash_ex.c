@@ -153,16 +153,18 @@ static void              FLASH_OB_GetPCROP(uint32_t * PCROPConfig, uint32_t * PC
   * 
   * @retval HAL Status
   */
-HAL_StatusTypeDef HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t *PageError)
+//HAL_StatusTypeDef HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t *PageError)
+__RAM_FUNC HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t *PageError)
 {
   HAL_StatusTypeDef status = HAL_ERROR;
   uint32_t page_index = 0;
-
+  FLASH_EraseInitTypeDef* EraseDefine;
+  EraseDefine=(FLASH_EraseInitTypeDef*)pEraseInit;
   /* Process Locked */
   __HAL_LOCK(&pFlash);
 
   /* Check the parameters */
-  assert_param(IS_FLASH_TYPEERASE(pEraseInit->TypeErase));
+  assert_param(IS_FLASH_TYPEERASE(EraseDefine->TypeErase));
 
   /* Wait for last operation to be completed */
   status = FLASH_WaitForLastOperation((uint32_t)FLASH_TIMEOUT_VALUE);
@@ -199,10 +201,10 @@ HAL_StatusTypeDef HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t
       pFlash.CacheToReactivate = FLASH_CACHE_DISABLED;
     }
 
-    if (pEraseInit->TypeErase == FLASH_TYPEERASE_MASSERASE)
+    if (EraseDefine->TypeErase == FLASH_TYPEERASE_MASSERASE)
     {
       /* Mass erase to be done */
-      FLASH_MassErase(pEraseInit->Banks);
+      FLASH_MassErase(EraseDefine->Banks);
 
       /* Wait for last operation to be completed */
       status = FLASH_WaitForLastOperation((uint32_t)FLASH_TIMEOUT_VALUE);
@@ -221,9 +223,9 @@ HAL_StatusTypeDef HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t
       /*Initialization of PageError variable*/
       *PageError = 0xFFFFFFFF;
       
-      for(page_index = pEraseInit->Page; page_index < (pEraseInit->Page + pEraseInit->NbPages); page_index++)
+      for(page_index = EraseDefine->Page; page_index < (EraseDefine->Page + EraseDefine->NbPages); page_index++)
       {
-        FLASH_PageErase(page_index, pEraseInit->Banks);
+        FLASH_PageErase(page_index, EraseDefine->Banks);
 
         /* Wait for last operation to be completed */
         status = FLASH_WaitForLastOperation((uint32_t)FLASH_TIMEOUT_VALUE);
