@@ -59,7 +59,8 @@ static __RAM_FUNC FMC_ProgramPage(uint32_t u32startAddr, uint32_t * u32buff);
 void CHECK_AND_SET_FLASH_PROTECTION(void);
 
 
-#define DFUVERSION_DATASIZE   	10
+#define CONF_MAX_STRING_LENGTH_13   	13
+#define DFUVERSION_DATASIZE				CONF_MAX_STRING_LENGTH_13
 /* Private variables ---------------------------------------------------------*/
 /* Status of Disk Functions */
 typedef unsigned char	BYTE;
@@ -70,15 +71,21 @@ typedef struct {
 	uint32_t BaseFirmwareChecksum;
 	uint32_t BaseFirmwareSize;
 	uint8_t  BaseFirmwareVersion[DFUVERSION_DATASIZE];
+	uint8_t  BaseFirmwareRunFlag; // 5A- flag that it has been run, any other value represent it is a first run
 	uint32_t NewFirmwareTag;         // for bootloader
 	uint32_t NewFirmwareChecksum;
 	uint32_t NewFirmwareSize;
 	uint8_t  NewFirmwareVersion[DFUVERSION_DATASIZE];// for bootloader
-	uint8_t  BootloaderFlag; //bit field bit0-is set by bootloader to inform success DFU, bit1-
-	uint8_t  OnceCopyBaseFirmwareFlag;
-}FirmwareManagerTypes;
+	uint8_t  NewFirmwareRunFlag; // 5A- flag that it has been run, any other value represent it is a first run
+	uint8_t  BootloaderDoneFlag; // 5A- flag that it has been run successfully, any other value represent opposite
+	uint8_t  OnceCopyBaseFirmwareFlag; //any value - Not Done(DEFAULT) , 0xAA - Done
+	uint8_t  RunningFirmwareVersion[DFUVERSION_DATASIZE];
+	// for bootloader NOTE: Do not change this location above structure element it should be at first location
+	//$$$$$$$$$##################IF YOU CHANGE BOOTLOADER AND FIRMWARE DFU will never work !!!!!!!!!!!!
+}__attribute__ ((packed))FirmwareInfoTypes;
 
-FirmwareManagerTypes FirmwareInfo;
+
+FirmwareInfoTypes FirmwareInfo;
 
 
 /* Results of Disk Functions */
@@ -98,7 +105,7 @@ typedef enum {
 static volatile DSTATUS Stat = STA_NOINIT;
 struct spi_flash *spiflashmem;
 
-#define USER_FLASH_START		0x08008000//0x08004000
+#define USER_FLASH_START		0x08006000
 #define IFLASH_PAGESIZE         FLASH_PAGE_SIZE //1024  //for internal flash
 
 
@@ -121,17 +128,19 @@ struct spi_flash *spiflashmem;
 
 #define CONFIGDATA_SECTORSTART				0 //NEVER CHANGE THIS, USED BY BOOTLOADER
 #define CONFIGDATA_SECTORSIZE				4 //NEVER CHANGE THIS, USED BY BOOTLOADER
-#define BASEFIRMWARE_SECTORSTART			(CONFIGDATA_SECTORSTART+CONFIGDATA_SECTORSIZE)
-#define BASEFIRMWARE_SECTORSIZE				60
-#define NEWFIRMWARE_SECTORSTART				(BASEFIRMWARE_SECTORSTART+BASEFIRMWARE_SECTORSIZE)
-#define NEWFIRMWARE_SECTORSIZE				60
+#define BASEFIRMWARE_SECTORSTART			CONFIGDATA_SECTORSTART+CONFIGDATA_SECTORSIZE
+#define BASEFIRMWARE_SECTORSIZE				58
+#define NEWFIRMWARE_SECTORSTART				BASEFIRMWARE_SECTORSTART+BASEFIRMWARE_SECTORSIZE
+#define NEWFIRMWARE_SECTORSIZE				58
+
+#define FIRMWARE_MAX_SIZE					0x3A000 //i.e 232K bytes (58 Sector of 4096 byte sector size)
 
 
-#define FLASH_SIZE_MAX	(4*1024*1024)//4Mbytes
-#define FIRMWARE_MAX_SIZE		0x0003C000 //245760 bytes
+#define SPIFLASH_SIZE_MAX	(4*1024*1024)//4Mbytes
 
-#define FLASH_TOTAL_PAGES 128
-#define NOOFBOOTLOADERPAGE 16
+
+#define FLASH_TOTAL_PAGES 128  // 258K/2K = 128 pages
+#define NOOFBOOTLOADERPAGE 12   //24K/2K= 12 pages
 #define ENABLE_BOOTLOADER_PROTECTION 1
 #define FIRST_PAGE_TO_PROTECT 0
 #define LAST_PAGE_TO_PROTECT (NOOFBOOTLOADERPAGE-1) //32K i.e 16 pages
@@ -144,13 +153,7 @@ struct spi_flash *spiflashmem;
 #define FIRMWARE_ERR_ADDR_OFFSET		(5)
 
 uint8_t BufferSector[4096];
-////uint8_t flashBuff[4096];//[IFLASH_PAGESIZE];
-//uint32_t fileSize;
-//uint32_t fileCrc;
-//uint32_t packetNo;
-//uint32_t firmwareFileOffSet;
-//uint32_t firmwareFileSize;
-//uint8_t usbRecv = 0;
+
 uint32_t memAddr = 0;
 uint32_t flashCheckSum;
 uint8_t retn=0;
@@ -166,8 +169,8 @@ void SystemClock_Config(void);
 
 /* USER CODE BEGIN PFP */
 
-uint8_t NVwriteConfigDB(FirmwareManagerTypes *Config,uint16_t size);
-uint8_t NVreadConfigDB(FirmwareManagerTypes *Config,uint16_t size);
+uint8_t NVwriteConfigDB(FirmwareInfoTypes *Config,uint16_t size);
+uint8_t NVreadConfigDB(FirmwareInfoTypes *Config,uint16_t size);
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -313,7 +316,7 @@ CHECK_AND_SET_FLASH_PROTECTION();
 		execute_user_code();
 
 	//Read the configuration data section where firmware member contains firmware Info
-	ret=NVreadConfigDB(&FirmwareInfo,sizeof(FirmwareManagerTypes));
+	ret=NVreadConfigDB(&FirmwareInfo,sizeof(FirmwareInfoTypes));
 	if(ret == 0)
 			  res = RES_OK;
 
@@ -338,13 +341,21 @@ CHECK_AND_SET_FLASH_PROTECTION();
 		if(FirmwareInfo.NewFirmwareSize < FIRMWARE_MAX_SIZE)
 		{
 			flashCheckSum = 0;
-			i=0;
-			for(i = 0; i < FirmwareInfo.NewFirmwareSize;i += IFLASH_PAGESIZE)
+			i=0;//FIRMWARE_MAX_SIZE
+			//for(i = 0; i < FirmwareInfo.NewFirmwareSize;i += IFLASH_PAGESIZE)
+			for(i = 0; i < FIRMWARE_MAX_SIZE;i += IFLASH_PAGESIZE)
 			{
 				//SST25_Read(i + FIRMWARE_BASE_ADDR,BufferSector, IFLASH_PAGESIZE);
 				//spiflashmem->read(spiflashmem, (64*FLASHSECTORSIZEBYTES),IFLASH_PAGESIZE,BufferSector);
 				PRINTF("\n\rProgram Page : %d of %d",( i/IFLASH_PAGESIZE),(FirmwareInfo.NewFirmwareSize/IFLASH_PAGESIZE) );
-				ret=SPIFlashRead( (i + (NEWFIRMWARE_SECTORSTART*FLASHSECTORSIZEBYTES)), IFLASH_PAGESIZE, BufferSector);
+				if(i < FirmwareInfo.NewFirmwareSize)
+				{
+					ret=SPIFlashRead( (i + (NEWFIRMWARE_SECTORSTART*FLASHSECTORSIZEBYTES)), IFLASH_PAGESIZE, BufferSector);
+				}//for remaining put Zero till
+				else
+				{
+					memset(BufferSector,'\0',IFLASH_PAGESIZE);
+				}
 				for(j = 0 ; j < IFLASH_PAGESIZE;j++)
 				{
 					if(i + j < FirmwareInfo.NewFirmwareSize)
@@ -356,7 +367,10 @@ CHECK_AND_SET_FLASH_PROTECTION();
 				FMC_ProgramPage((USER_FLASH_START + i),(uint8_t*)BufferSector);
 			    memAddr = (uint32_t)(USER_FLASH_START + i);//pointer/address of Internal just written
 				if(memcmp((uint8_t*)BufferSector, (uint8_t*)memAddr , IFLASH_PAGESIZE) != NULL)
+				{
+					PRINTF("\n\r $$%%% ERROR write @ %08x",memAddr);
 					break;
+				}
 				HAL_Delay(50);
 			}
 			PRINTF("\n\r Calc Checksum=%d , StoreChecksum=%d",flashCheckSum ,FirmwareInfo.NewFirmwareChecksum);
@@ -369,7 +383,7 @@ CHECK_AND_SET_FLASH_PROTECTION();
 			}
 			else
 			{
-				PRINTF("\n\r ERROR MISMATCH CHECKSUM");
+				PRINTF("\n\r ERROR MISMATCH CHECKSUM");//try flash Base firmware
 				exit=0;
 				tryNum=0;
 			}
@@ -475,7 +489,7 @@ CHECK_AND_SET_FLASH_PROTECTION();
 
 	//SST25_Erase(FIRMWARE_INFO_ADDR,block4k);
 	//ret|=spiflashmem->erase(spiflashmem,FIRMWARE_INFO_ADDR, 4096);// Clear INFO ON FIRMWARE
-	NVwriteConfigDB(&FirmwareInfo,sizeof(FirmwareManagerTypes));
+	NVwriteConfigDB(&FirmwareInfo,sizeof(FirmwareInfoTypes));
 	HAL_FLASH_Lock();
 	execute_user_code();
 
@@ -666,7 +680,7 @@ void CHECK_AND_SET_FLASH_PROTECTION(void)
 	}
 }
 
-uint8_t NVwriteConfigDB(FirmwareManagerTypes *Config,uint16_t size)
+uint8_t NVwriteConfigDB(FirmwareInfoTypes *Config,uint16_t size)
 {
 	uint8_t* buffptr;
 	buffptr=(uint8_t*) Config;
@@ -691,7 +705,7 @@ uint8_t NVwriteConfigDB(FirmwareManagerTypes *Config,uint16_t size)
 	else
 		return SPIFLASH_ERROR;
 }
-uint8_t NVreadConfigDB(FirmwareManagerTypes *Config,uint16_t size)
+uint8_t NVreadConfigDB(FirmwareInfoTypes *Config,uint16_t size)
 {
 	uint8_t* buffptr;
 	buffptr=(uint8_t*) Config;
