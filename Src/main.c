@@ -53,11 +53,12 @@
 
 /* USER CODE BEGIN PV */
 //
+static __RAM_FUNC updateBaseFirmware(void);
 static __RAM_FUNC myFMC_Erase(uint32_t u32addr);
 static __RAM_FUNC myFMC_EraseAll(uint32_t u32addr);
 static __RAM_FUNC FMC_ProgramPage(uint32_t u32startAddr, uint32_t * u32buff);
 void CHECK_AND_SET_FLASH_PROTECTION(void);
-
+uint8_t writeSPIFlashSector(uint16_t sectorNum, uint16_t lenByte, void* buff);
 
 #define CONF_MAX_STRING_LENGTH_13   	13
 #define DFUVERSION_DATASIZE				CONF_MAX_STRING_LENGTH_13
@@ -66,23 +67,26 @@ void CHECK_AND_SET_FLASH_PROTECTION(void);
 typedef unsigned char	BYTE;
 typedef BYTE	DSTATUS;
 
-typedef struct {
-	uint32_t BaseFirmwareTag;
-	uint32_t BaseFirmwareChecksum;
-	uint32_t BaseFirmwareSize;
-	uint8_t  BaseFirmwareVersion[DFUVERSION_DATASIZE];
-	uint8_t  BaseFirmwareRunFlag; // 5A- flag that it has been run, any other value represent it is a first run
-	uint32_t NewFirmwareTag;         // for bootloader
-	uint32_t NewFirmwareChecksum;
-	uint32_t NewFirmwareSize;
-	uint8_t  NewFirmwareVersion[DFUVERSION_DATASIZE];// for bootloader
-	uint8_t  NewFirmwareRunFlag; // 5A- flag that it has been run, any other value represent it is a first run
-	uint8_t  BootloaderDoneFlag; // 5A- flag that it has been run successfully, any other value represent opposite
-	uint8_t  OnceCopyBaseFirmwareFlag; //any value - Not Done(DEFAULT) , 0xAA - Done
-	uint8_t  RunningFirmwareVersion[DFUVERSION_DATASIZE];
-	// for bootloader NOTE: Do not change this location above structure element it should be at first location
-	//$$$$$$$$$##################IF YOU CHANGE BOOTLOADER AND FIRMWARE DFU will never work !!!!!!!!!!!!
-}__attribute__ ((packed))FirmwareInfoTypes;
+
+	//Firmware Information
+	typedef struct {
+		uint32_t BaseFirmwareTag;
+		uint32_t BaseFirmwareChecksum;
+		uint32_t BaseFirmwareSize;
+		uint8_t  BaseFirmwareVersion[DFUVERSION_DATASIZE];
+		uint8_t  BaseFirmwareRunFlag; // 5A- flag that it has been run, any other value represent it is a first run
+		uint32_t NewFirmwareTag;         // for bootloader
+		uint32_t NewFirmwareChecksum;
+		uint32_t NewFirmwareSize;
+		uint8_t  NewFirmwareVersion[DFUVERSION_DATASIZE];// for bootloader
+		uint8_t  NewFirmwareRunFlag; // 5A- flag that it has been run, any other value represent it is a first run
+		uint8_t  BootloaderDoneFlag; // 5A- flag that it has been run successfully, any other value represent opposite
+		uint8_t  RunningFirmwareVersion[DFUVERSION_DATASIZE];
+		// for bootloader NOTE: Do not change this location above structure element it should be at first location
+		//$$$$$$$$$##################IF YOU CHANGE BOOTLOADER AND FIRMWARE DFU will never work !!!!!!!!!!!!
+	}__attribute__ ((packed))FirmwareInfoTypes;
+
+
 
 
 FirmwareInfoTypes FirmwareInfo;
@@ -128,9 +132,9 @@ struct spi_flash *spiflashmem;
 
 #define CONFIGDATA_SECTORSTART				0 //NEVER CHANGE THIS, USED BY BOOTLOADER
 #define CONFIGDATA_SECTORSIZE				4 //NEVER CHANGE THIS, USED BY BOOTLOADER
-#define BASEFIRMWARE_SECTORSTART			CONFIGDATA_SECTORSTART+CONFIGDATA_SECTORSIZE
+#define BASEFIRMWARE_SECTORSTART			(CONFIGDATA_SECTORSTART+CONFIGDATA_SECTORSIZE)
 #define BASEFIRMWARE_SECTORSIZE				58
-#define NEWFIRMWARE_SECTORSTART				BASEFIRMWARE_SECTORSTART+BASEFIRMWARE_SECTORSIZE
+#define NEWFIRMWARE_SECTORSTART				(BASEFIRMWARE_SECTORSTART+BASEFIRMWARE_SECTORSIZE)
 #define NEWFIRMWARE_SECTORSIZE				58
 
 #define FIRMWARE_MAX_SIZE					0x3A000 //i.e 232K bytes (58 Sector of 4096 byte sector size)
@@ -152,12 +156,11 @@ struct spi_flash *spiflashmem;
 #define FIRMWARE_START_ADDR_OFFSET		(4)
 #define FIRMWARE_ERR_ADDR_OFFSET		(5)
 
-uint8_t BufferSector[4096];
+uint8_t IFlashPageBuffer[4096];
 
 uint32_t memAddr = 0;
 uint32_t flashCheckSum;
 uint8_t retn=0;
-//static uint8_t tempSectorBuff[FLASHSECTORSIZEBYTES];
 
 
 FLASH_OBProgramInitTypeDef FlashOBstatus;
@@ -176,14 +179,17 @@ uint8_t NVreadConfigDB(FirmwareInfoTypes *Config,uint16_t size);
 /* Private function prototypes -----------------------------------------------*/
 uint8_t SPIFlashRead(uint32_t address, uint32_t byteLen, void *databuff)
 {
-
-	if(0==spiflashmem->read(spiflashmem, address,byteLen,(uint8_t*)databuff))
+	uint8_t *buffer;
+	buffer=(uint8_t*)databuff;
+	PRINTF("\n\rBOOTLOADER : SPIFlash Read @Address =%u , len=%u",address,byteLen);
+	if(0==spiflashmem->read(spiflashmem, address,byteLen,buffer))
 		return SUCCESS;
 	else
 		return SPIFLASH_ERROR;
 }
 uint8_t SPIFlashErase(uint32_t address, uint32_t byteLen)
 {
+
 	if(0==spiflashmem->erase(spiflashmem, address,byteLen))
 		return SUCCESS;
 	else
@@ -191,7 +197,10 @@ uint8_t SPIFlashErase(uint32_t address, uint32_t byteLen)
 }
 uint8_t SPIFlashWrite(uint32_t address, uint32_t byteLen, void *databuff)
 {
-	if(0==spiflashmem->write(spiflashmem, address,byteLen,(uint8_t*)databuff))
+	uint8_t *buffer;
+	buffer=(uint8_t*)databuff;
+	//PRINTF("\n\rBOOTLOADER : SPIFlash Write @Address =%u , len=%u",address,byteLen);
+	if(0==spiflashmem->write(spiflashmem, address,byteLen,buffer))
 		return SUCCESS;
 	else
 		return SPIFLASH_ERROR;
@@ -217,10 +226,8 @@ void execute_user_code(void)
 	//SysDeInit();
 	uint32_t appAddress;
 	appAddress=USER_FLASH_START;
-	PRINTF("\n\rExecuting User Program....@ 0x%08X",appAddress);
+	PRINTF("\n\rBOOTLOADER : Executing User Program....@ 0x%08X\n\n\n\n\n\n\r",appAddress);
 
-	//HAL_GPIO_DeInit();
-	//HAL_SPI_DeInit(&hspi2);
 	  /* Jump to user application */
 	  JumpAddress = *(__IO uint32_t*) (appAddress + 4);
 	  Jump_To_Application = (pFunction) JumpAddress;
@@ -231,16 +238,6 @@ void execute_user_code(void)
 
 
 
-//	if (((*(volatile uint32_t*)USER_FLASH_START) & 0x2FFF0000 ) == 0x20000000)
-//    { /* Jump to user application */
-//			//
-//	  //SCB->VTOR = USER_FLASH_START;
-//      JumpAddress = *(volatile uint32_t*) (USER_FLASH_START + 4);
-//      Jump_To_Application = (pFunction) JumpAddress;
-//      /* Initialize user application's Stack Pointer */
-//      __set_MSP(*(volatile uint32_t*) USER_FLASH_START);
-//      Jump_To_Application();
-//    }
 }
 /* USER CODE END PFP */
 
@@ -254,13 +251,9 @@ int main(void)
   /* USER CODE BEGIN 1 */
 	DRESULT res = RES_ERROR;
 	int ret=0;
-	uint32_t *u32Pt = (uint32_t *)BufferSector;
-	uint8_t *u8pt,u8temp;
+
 	int32_t i = 3000000,j = 0;
-	uint32_t u32temp,timeOut = 20000000;
-	uint8_t tryNum,exit;
-	//SysInit();
-//	while(i--);
+
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -289,7 +282,7 @@ int main(void)
 #if ENABLE_BOOTLOADER_PROTECTION
 /* Ensures that the first sector of flash is write-protected preventing that the
 bootloader is overwritten */
-CHECK_AND_SET_FLASH_PROTECTION();
+//CHECK_AND_SET_FLASH_PROTECTION();
 #endif
 
 //HAL_FLASHEx_OBGetConfig(&FlashOBstatus);
@@ -309,187 +302,153 @@ CHECK_AND_SET_FLASH_PROTECTION();
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-//	u32Pt = (uint32_t *)BufferSector;
+
+
+	PRINTF("\n\rBOOTLOADER : Starting ......");
+//	u32Pt = (uint32_t *)IFlashPageBuffer;
 //	SST25_Init();
-//	SST25_Read(FIRMWARE_INFO_ADDR + FIRMWARE_STATUS_OFFSET*4,BufferSector,4);
+//	SST25_Read(FIRMWARE_INFO_ADDR + FIRMWARE_STATUS_OFFSET*4,IFlashPageBuffer,4);
 	if(HAL_FLASH_Unlock()!=HAL_OK)
+	{
+		PRINTF("\n\rBOOTLOADER : Error to unlock Internal Flash");
 		execute_user_code();
+	}
 
 	//Read the configuration data section where firmware member contains firmware Info
 	ret=NVreadConfigDB(&FirmwareInfo,sizeof(FirmwareInfoTypes));
 	if(ret == 0)
 			  res = RES_OK;
+	PRINTF("\n\rBOOTLOADER : New Firmware Tag= 0x%08X , BaseFirmwareTag=0x%08x",FirmwareInfo.NewFirmwareTag, FirmwareInfo.BaseFirmwareTag);
 
+
+
+
+
+	//Check New Firmware is available or not , if not available
 	if(FirmwareInfo.NewFirmwareTag != 0x5A5A5A5A)
 	{
 		HAL_FLASH_Lock();
-
-		execute_user_code();
+		//proceed to check Base firmware check
 	}
-//	FirmwareInfo.NewFirmwareTag=0;
-//	NVwriteConfigDB(&FirmwareInfo,sizeof(FirmwareManagerTypes));
-	tryNum = 10;
-	exit = 0;
-	while(!exit && tryNum--)
+	else
 	{
-//		//SST25_Read(FIRMWARE_INFO_ADDR + FIRMWARE_CRC_OFFSET*4,BufferSector,4);
-//		ret|=spiflashmem->read(spiflashmem, FIRMWARE_INFO_ADDR + FIRMWARE_CRC_OFFSET*4, 4, BufferSector);
-//		fileCrc = 	*u32Pt;
-//		//SST25_Read(FIRMWARE_INFO_ADDR + FIRMWARE_FILE_SIZE_OFFSET*4,BufferSector,4);
-//		ret|=spiflashmem->read(spiflashmem, FIRMWARE_INFO_ADDR + FIRMWARE_FILE_SIZE_OFFSET*4, 4, BufferSector);
-//		fileSize = 	*u32Pt;
-		if(FirmwareInfo.NewFirmwareSize < FIRMWARE_MAX_SIZE)
+
+		PRINTF("\n\rBOOTLOADER : Flashing NEW FIRMWARE FROM SPI FLASH");
+		PRINTF("\n\rBOOTLOADER : New Firmware Size-%u checksum-%u",FirmwareInfo.NewFirmwareSize,FirmwareInfo.NewFirmwareChecksum );
+
+		flashCheckSum = 0;
+		i=0;//FIRMWARE_MAX_SIZE
+		//for(i = 0; i < FirmwareInfo.NewFirmwareSize;i += IFLASH_PAGESIZE)
+		for(i = 0; i < FIRMWARE_MAX_SIZE;i += IFLASH_PAGESIZE)
 		{
-			flashCheckSum = 0;
-			i=0;//FIRMWARE_MAX_SIZE
-			//for(i = 0; i < FirmwareInfo.NewFirmwareSize;i += IFLASH_PAGESIZE)
-			for(i = 0; i < FIRMWARE_MAX_SIZE;i += IFLASH_PAGESIZE)
+			//SST25_Read(i + FIRMWARE_BASE_ADDR,IFlashPageBuffer, IFLASH_PAGESIZE);
+			//spiflashmem->read(spiflashmem, (64*FLASHSECTORSIZEBYTES),IFLASH_PAGESIZE,IFlashPageBuffer);
+			PRINTF("\n\rBOOTLOADER : Program Page : %d of %d from SPIFLash adrss=%u",( i/IFLASH_PAGESIZE),(FirmwareInfo.NewFirmwareSize/IFLASH_PAGESIZE),(i + (NEWFIRMWARE_SECTORSTART*FLASHSECTORSIZEBYTES)) );
+
+			ret=SPIFlashRead( (i + (NEWFIRMWARE_SECTORSTART*FLASHSECTORSIZEBYTES)), IFLASH_PAGESIZE, IFlashPageBuffer);
+			for(j = 0 ; j < IFLASH_PAGESIZE;j++)
 			{
-				//SST25_Read(i + FIRMWARE_BASE_ADDR,BufferSector, IFLASH_PAGESIZE);
-				//spiflashmem->read(spiflashmem, (64*FLASHSECTORSIZEBYTES),IFLASH_PAGESIZE,BufferSector);
-				PRINTF("\n\rProgram Page : %d of %d",( i/IFLASH_PAGESIZE),(FirmwareInfo.NewFirmwareSize/IFLASH_PAGESIZE) );
-				if(i < FirmwareInfo.NewFirmwareSize)
-				{
-					ret=SPIFlashRead( (i + (NEWFIRMWARE_SECTORSTART*FLASHSECTORSIZEBYTES)), IFLASH_PAGESIZE, BufferSector);
-				}//for remaining put Zero till
-				else
-				{
-					memset(BufferSector,'\0',IFLASH_PAGESIZE);
-				}
-				for(j = 0 ; j < IFLASH_PAGESIZE;j++)
-				{
-					if(i + j < FirmwareInfo.NewFirmwareSize)
-						flashCheckSum += BufferSector[j];
-					else
-						break;
-				}
-				myFMC_Erase((uint32_t)(USER_FLASH_START + i));
-				FMC_ProgramPage((USER_FLASH_START + i),(uint8_t*)BufferSector);
-			    memAddr = (uint32_t)(USER_FLASH_START + i);//pointer/address of Internal just written
-				if(memcmp((uint8_t*)BufferSector, (uint8_t*)memAddr , IFLASH_PAGESIZE) != NULL)
-				{
-					PRINTF("\n\r $$%%% ERROR write @ %08x",memAddr);
-					break;
-				}
-				HAL_Delay(50);
+				flashCheckSum += IFlashPageBuffer[j];
 			}
-			PRINTF("\n\r Calc Checksum=%d , StoreChecksum=%d",flashCheckSum ,FirmwareInfo.NewFirmwareChecksum);
-			if(flashCheckSum == FirmwareInfo.NewFirmwareChecksum)
+			myFMC_Erase((uint32_t)(USER_FLASH_START + i));
+			FMC_ProgramPage((USER_FLASH_START + i),(uint8_t*)IFlashPageBuffer);
+			memAddr = (uint32_t)(USER_FLASH_START + i);//pointer/address of Internal just written
+			if(memcmp((uint8_t*)IFlashPageBuffer, (uint8_t*)memAddr , IFLASH_PAGESIZE) != NULL)
 			{
-				//clear the tag of New Firmware
-				FirmwareInfo.NewFirmwareTag=0;
-				exit=0;
-				tryNum=0;
+				PRINTF("\n\rBOOTLOADER :  $$%%% ERROR write @ %08x, index=0x%08x",memAddr,i);
+				break;
+			}
+			HAL_Delay(10);
+		}
+
+		PRINTF("\n\rBOOTLOADER :  Calc Checksum=%d , StoreChecksum=%d",flashCheckSum ,FirmwareInfo.NewFirmwareChecksum);
+		if(flashCheckSum == FirmwareInfo.NewFirmwareChecksum)
+		{
+			PRINTF("\n\rBOOTLOADER : Flashing NEW FIRMWARE FROM SPI FLASH DONE SUCCCESSFULLY");
+			//clear the tag of New Firmware
+			FirmwareInfo.NewFirmwareTag=0;
+			for(int l=0;l<CONF_MAX_STRING_LENGTH_13;l++)
+				FirmwareInfo.RunningFirmwareVersion[l]=FirmwareInfo.NewFirmwareVersion[l];
+			FirmwareInfo.BootloaderDoneFlag=0x5A;// to flag user application that New Firmware programmed successfully
+		}
+		else // Fallback machenism to Base Firmware kick in here
+		{
+			PRINTF("\n\n\n\rBOOTLOADER :  ERROR MISMATCH CHECKSUM OR WRITE ERROR");//try flash Base firmware
+			PRINTF("\n\n\rBOOTLOADER :  FALL BACK TO BASEFIRMWARE");//try flash Base firmware
+			//FALLBACK TO BASE FRIMWARE
+			if(FirmwareInfo.BaseFirmwareTag == 0x5A5A5A5A)//check presence of BaseFirmware
+			{
+				flashCheckSum = 0;
+
+				i=0;//FIRMWARE_MAX_SIZE
+				//for(i = 0; i < FirmwareInfo.NewFirmwareSize;i += IFLASH_PAGESIZE)
+				for(i = 0; i < FIRMWARE_MAX_SIZE;i += IFLASH_PAGESIZE)
+				{
+					//SST25_Read(i + FIRMWARE_BASE_ADDR,IFlashPageBuffer, IFLASH_PAGESIZE);
+					//spiflashmem->read(spiflashmem, (64*FLASHSECTORSIZEBYTES),IFLASH_PAGESIZE,IFlashPageBuffer);
+					PRINTF("\n\rBOOTLOADER : Program Page : %d of %d",( i/IFLASH_PAGESIZE),(FirmwareInfo.BaseFirmwareSize/IFLASH_PAGESIZE) );
+					ret=SPIFlashRead( (i + (BASEFIRMWARE_SECTORSTART*FLASHSECTORSIZEBYTES)), IFLASH_PAGESIZE, IFlashPageBuffer);
+
+					for(j = 0 ; j < IFLASH_PAGESIZE;j++)//calculate checksum
+					{
+						if(i + j < FirmwareInfo.BaseFirmwareSize)
+							flashCheckSum += IFlashPageBuffer[j];
+						else
+							break;
+					}
+					myFMC_Erase((uint32_t)(USER_FLASH_START + i));
+					FMC_ProgramPage((USER_FLASH_START + i),(uint8_t*)IFlashPageBuffer);
+					memAddr = (uint32_t)(USER_FLASH_START + i);//pointer/address of Internal just written
+					if(memcmp((uint8_t*)IFlashPageBuffer, (uint8_t*)memAddr , IFLASH_PAGESIZE) != NULL)
+					{
+						PRINTF("\n\rBOOTLOADER :  $$%%% ERROR write @ %08x",memAddr);
+						break;
+					}
+					HAL_Delay(50);
+				}
+
+				if(flashCheckSum == FirmwareInfo.BaseFirmwareChecksum)
+					PRINTF("\n\rBOOTLOADER :  MATCHED CHECKSUM OF BASE FIRMWARE",memAddr);
+				else
+					PRINTF("\n\rBOOTLOADER :  ***** ???? MISMATCHED CHECKSUM OF BASE FIRMWARE",memAddr);
+				for(int l=0;l<CONF_MAX_STRING_LENGTH_13;l++)
+					FirmwareInfo.RunningFirmwareVersion[l]=FirmwareInfo.BaseFirmwareVersion[l];
+
 			}
 			else
-			{
-				PRINTF("\n\r ERROR MISMATCH CHECKSUM");//try flash Base firmware
-				exit=0;
-				tryNum=0;
-			}
-//			if(flashCheckSum == FirmwareInfo.NewFirmwareChecksum)//check if New Firmware is successfullly written to internal Flash
-//			{
-//					//SST25_Read(BASE_FIRMWARE_INFO_ADDR + FIRMWARE_STATUS_OFFSET*4,BufferSector,4);
-//					ret|=spiflashmem->read(spiflashmem,BASE_FIRMWARE_INFO_ADDR + FIRMWARE_STATUS_OFFSET*4, 4, BufferSector);
-//					if(*u32Pt != 0x5A5A5A5A)
-//					{
-//						tryNum = 10;
-//						while(tryNum--)//Copy all New firmware to Base Firmware
-//						{
-//							flashCheckSum = 0;
-//							for(i = 0; i < fileSize;i += 4096)
-//							{
-//								//SST25_Read(i + FIRMWARE_BASE_ADDR,BufferSector, 256);
-//								ret|=spiflashmem->read(spiflashmem,i + FIRMWARE_BASE_ADDR, 4096, BufferSector);
-//								//SST25_Write(i + BASE_FIRMWARE_BASE_ADDR,BufferSector, 256);
-//								ret|=spiflashmem->erase(spiflashmem,i + BASE_FIRMWARE_BASE_ADDR, 4096);
-//								ret|=spiflashmem->write(spiflashmem,i + BASE_FIRMWARE_BASE_ADDR, 4096, BufferSector);
-//								//SST25_Read(i + BASE_FIRMWARE_BASE_ADDR,flashBuff, 256);
-//								ret|=spiflashmem->read(spiflashmem,i + BASE_FIRMWARE_BASE_ADDR, 4096, flashBuff);
-//								//if(memcmp(BufferSector,flashBuff,256) != NULL)
-//								if(memcmp(BufferSector,flashBuff,4096) != NULL)
-//								{
-//										break;
-//								}
-//							}
-//							if(i >= fileSize)//check the checksum after copy done to Base frimware location
-//								for(i = 0; i < fileSize;i += 256)
-//								{
-//										//SST25_Read(i + BASE_FIRMWARE_BASE_ADDR,BufferSector, 256);
-//										ret|=spiflashmem->read(spiflashmem,i + BASE_FIRMWARE_BASE_ADDR, 256, BufferSector);
-//										for(j = 0 ; j < 256;j++)
-//										{
-//											if(i + j < fileSize)
-//												flashCheckSum += BufferSector[j];
-//											else
-//												break;
-//										}
-//								}
-//							if(flashCheckSum == fileCrc)
-//							{
-//								//SST25_Read(FIRMWARE_INFO_ADDR,BufferSector, 256);
-//								ret|=spiflashmem->read(spiflashmem,FIRMWARE_INFO_ADDR, 4096, BufferSector);
-//								//SST25_Write(BASE_FIRMWARE_INFO_ADDR,BufferSector, 256);
-//								ret|=spiflashmem->erase(spiflashmem,BASE_FIRMWARE_INFO_ADDR, 4096);
-//								ret|=spiflashmem->write(spiflashmem,BASE_FIRMWARE_INFO_ADDR, 4096, BufferSector);
-//								//SST25_Read(BASE_FIRMWARE_INFO_ADDR,flashBuff, 256);
-//								ret|=spiflashmem->read(spiflashmem,i + BASE_FIRMWARE_BASE_ADDR, 4096, BufferSector);
-//								if(memcmp(BufferSector,flashBuff,4096) == NULL)
-//								{
-//										break;
-//								}
-//							}
-//						}
-//					}
-//					exit = 1;
-//				}
-			}
-		}
-//		if(exit == 0 && tryNum == 0xff)
-//		{
-//			tryNum = 10;
-//			exit = 0;
-//			while(!exit && tryNum--)
-//			{
-//				//SST25_Read(BASE_FIRMWARE_INFO_ADDR + FIRMWARE_CRC_OFFSET*4,BufferSector,4);
-//				ret|=spiflashmem->read(spiflashmem, BASE_FIRMWARE_INFO_ADDR + FIRMWARE_CRC_OFFSET*4, 4, BufferSector);
-//				fileCrc = 	*u32Pt;
-//				//SST25_Read(BASE_FIRMWARE_INFO_ADDR + FIRMWARE_FILE_SIZE_OFFSET*4,BufferSector,4);
-//				ret|=spiflashmem->read(spiflashmem, BASE_FIRMWARE_INFO_ADDR + FIRMWARE_FILE_SIZE_OFFSET*4, 4, BufferSector);
-//				fileSize = 	*u32Pt;
-//				if(fileSize < FIRMWARE_MAX_SIZE)
-//				{
-//					flashCheckSum = 0;
-//					for(i = 0; i < fileSize;i += IFLASH_PAGESIZE)
-//					{
-//						//SST25_Read(i + BASE_FIRMWARE_BASE_ADDR,BufferSector, IFLASH_PAGESIZE);
-//						ret|=spiflashmem->read(spiflashmem, i + BASE_FIRMWARE_BASE_ADDR, IFLASH_PAGESIZE, BufferSector);
-//						for(j = 0 ; j < IFLASH_PAGESIZE;j++)
-//						{
-//								if(i + j < fileSize)
-//									flashCheckSum += BufferSector[j];
-//								else
-//									break;
-//						}
-//						myFMC_Erase(USER_FLASH_START + i);
-//						FMC_ProgramPage(USER_FLASH_START + i,u32Pt);
-//						//SST25_Read(i + BASE_FIRMWARE_BASE_ADDR,BufferSector, IFLASH_PAGESIZE);
-//						ret|=spiflashmem->read(spiflashmem, i + BASE_FIRMWARE_BASE_ADDR, IFLASH_PAGESIZE, BufferSector);
-//						memAddr = USER_FLASH_START + i;
-//						if(memcmp(BufferSector, (void*)memAddr , IFLASH_PAGESIZE) != NULL)
-//							break;
-//					}
-//					if(flashCheckSum == fileCrc)
-//					{
-//							exit = 1;
-//					}
-//				}
-//			}
-//		}
+				PRINTF("\n\n\rBOOTLOADER :  *** ???? NO BASEFIRMWARE");
 
-	//SST25_Erase(FIRMWARE_INFO_ADDR,block4k);
-	//ret|=spiflashmem->erase(spiflashmem,FIRMWARE_INFO_ADDR, 4096);// Clear INFO ON FIRMWARE
-	NVwriteConfigDB(&FirmwareInfo,sizeof(FirmwareInfoTypes));
+			FirmwareInfo.BootloaderDoneFlag=0;// to flag user application that New Firmware NOT programmed
+		}
+	}
+
+
+	//Check Base Tag : If no tag, programmed External Base Flash area with That running/new firmware
+	if(FirmwareInfo.BaseFirmwareTag != 0x5A5A5A5A)// No tag on base Program the Base from Internal running firmware
+	{
+		PRINTF("\n\rBOOTLOADER : Copy Current Firmware to Base Firmware Copy on SPIFlash");
+
+
+		//Copy running firmware to Base Firmware
+		FirmwareInfo.BaseFirmwareTag=0x5A5A5A5A;//mark it has been done
+		FirmwareInfo.BaseFirmwareChecksum=0;
+		FirmwareInfo.BaseFirmwareSize=FIRMWARE_MAX_SIZE;
+		FirmwareInfo.BaseFirmwareRunFlag=0x5A; //mark it has run
+		for(int i=0;i<DFUVERSION_DATASIZE;i++)
+			FirmwareInfo.BaseFirmwareVersion[i]=FirmwareInfo.RunningFirmwareVersion[i];
+
+		//Copy firmware to external flash
+		updateBaseFirmware();//checksum calculated inside this function
+
+		//NVwriteConfigDB(&FirmwareInfo,sizeof(FirmwareInfoTypes));
+		PRINTF("\n\n\n\rBOOTLOADER : Copy to BaseFirmware area in External SPI Flash Done ***");
+
+	}
+
+
+	// Store back updated FirmwareInformation to SPI FLash
+	retn=NVwriteConfigDB(&FirmwareInfo,sizeof(FirmwareInfoTypes));
+	PRINTF("\n\n\n\rBOOTLOADER : Config Write return = %d",retn);
 	HAL_FLASH_Lock();
 	execute_user_code();
 
@@ -585,6 +544,43 @@ void vcom_Send( char *format, ... )
 
   va_end(args);
 }
+__RAM_FUNC updateBaseFirmware(void)
+{
+	//Copy base firmware if need
+	uint8_t * programPtr;
+	uint8_t* rambuff;
+	uint32_t bytecnt=0,extFlashSectorBytecnt=0;
+
+	uint16_t SectorWriteCnt=0,retrn;
+	rambuff=(uint8_t*)malloc(FLASHSECTORSIZEBYTES);
+	programPtr=(uint8_t*)USER_FLASH_START;//point to start of application on internal flash
+	for(bytecnt=0; bytecnt<FIRMWARE_MAX_SIZE;bytecnt++)
+	{
+
+		if(bytecnt!=0 && (bytecnt%FLASHSECTORSIZEBYTES==0))//sector alignment check
+		{
+			PRINTF("\n\rBOOTLOADER : SPI SECTOR ERASE WRITE @ %d",BASEFIRMWARE_SECTORSTART+SectorWriteCnt);
+			//write the buffer to external flash Base Firmware area
+
+			retrn=writeSPIFlashSector((BASEFIRMWARE_SECTORSTART+SectorWriteCnt), FLASHSECTORSIZEBYTES, rambuff);
+			if(retrn!=SUCCESS)
+			{
+				PRINTF("\n\rBOOTLOADER : BASE FIRMWARE COPY ERROR ******");
+
+				//reboot or trap the system here Note: TO DO
+			}
+			SectorWriteCnt++;
+			extFlashSectorBytecnt+=FLASHSECTORSIZEBYTES;
+
+		}
+		//PRINTF(",%d:0x%02X",bytecnt,*(programPtr+bytecnt));
+		rambuff[bytecnt-extFlashSectorBytecnt]=*(programPtr+bytecnt);
+		FirmwareInfo.BaseFirmwareChecksum=FirmwareInfo.BaseFirmwareChecksum + *(programPtr+bytecnt);
+
+
+	}
+	free(rambuff);
+}
 __RAM_FUNC myFMC_Erase(uint32_t u32addr)
 {
 	uint16_t  FlashStatus;
@@ -597,7 +593,7 @@ __RAM_FUNC myFMC_Erase(uint32_t u32addr)
 
 
 	//FLASH_ClearFlag(FLASH_FLAG_EOP|FLASH_FLAG_PGAERR|FLASH_FLAG_PROGERR);
-	PRINTF("\n\rErasing Page : %d Bank1 @Address: 0x%08x",InternalFlashPageNo,u32addr );
+	PRINTF("\n\rBOOTLOADER : Erasing Page %d of Bank1 @Address: 0x%08x",InternalFlashPageNo,u32addr );
 
 	eraseinstance.Banks=1;
 	eraseinstance.NbPages=1;
@@ -684,9 +680,13 @@ uint8_t NVwriteConfigDB(FirmwareInfoTypes *Config,uint16_t size)
 {
 	uint8_t* buffptr;
 	buffptr=(uint8_t*) Config;
+
+	//debug
+	PRINTF("\n\rBOOTLOADER : Write Function called : BaseFirmwareTag [0x%08x], NewFirmwareTag [0x%08x]",Config->BaseFirmwareTag,Config->NewFirmwareTag );
+
 	if(size <= FLASHSECTORSIZEBYTES)
 	{
-		retn=SPIFlashWrite(CONFIGDATA_SECTORSTART*FLASHSECTORSIZEBYTES, size,buffptr);
+		retn=writeSPIFlashSector(CONFIGDATA_SECTORSTART, size,buffptr);
 		if(retn==0)
 			return SUCCESS;
 		else
@@ -694,9 +694,9 @@ uint8_t NVwriteConfigDB(FirmwareInfoTypes *Config,uint16_t size)
 	}
 	else if(size <= FLASHSECTORSIZEBYTES*2)//it support manager data size more than 1 sector or >4096 bytes
 	{
-		retn=SPIFlashWrite(CONFIGDATA_SECTORSTART*FLASHSECTORSIZEBYTES, FLASHSECTORSIZEBYTES, buffptr);
+		retn=writeSPIFlashSector(CONFIGDATA_SECTORSTART, FLASHSECTORSIZEBYTES, buffptr);
 		//retn|=writeSPIFlashSector((DBManager.SectorStart[RECORDMANAGER]+1),sizeOfmanager-DBManager.FlashSectorSize,bytebybyte+FLASHSECTORSIZEBYTES);
-		retn|=SPIFlashWrite((CONFIGDATA_SECTORSTART+1)*FLASHSECTORSIZEBYTES, size-FLASHSECTORSIZEBYTES, buffptr+FLASHSECTORSIZEBYTES);
+		retn|=writeSPIFlashSector((CONFIGDATA_SECTORSTART+1), size-FLASHSECTORSIZEBYTES, buffptr+FLASHSECTORSIZEBYTES);
 		if(retn==0)
 			return SUCCESS;
 		else
@@ -710,10 +710,47 @@ uint8_t NVreadConfigDB(FirmwareInfoTypes *Config,uint16_t size)
 	uint8_t* buffptr;
 	buffptr=(uint8_t*) Config;
 	retn=SPIFlashRead(CONFIGDATA_SECTORSTART*FLASHSECTORSIZEBYTES, size,buffptr);
+
+	//debug
+		PRINTF("\n\rBOOTLOADER : Read Function called return:%d ",retn);
 	if(retn==0)
 		return SUCCESS;
 	else
 		return SPIFLASH_ERROR;
+}
+
+
+uint8_t writeSPIFlashSector(uint16_t sectorNum, uint16_t lenByte, void* buff)
+{
+
+	uint8_t retrycnt=FLASHWRITE_RETRY; //Handle multiple retry of Sector Write
+	uint16_t retn=0;
+	uint32_t addrs= sectorNum*FLASHSECTORSIZEBYTES;
+	uint8_t byteacessBuff[lenByte];
+
+
+
+	while(retrycnt!=0)//try multiple write if not successful
+	{
+		retn=0;
+		retn=SPIFlashErase(addrs,FLASHSECTORSIZEBYTES);
+		retn|=SPIFlashWrite(addrs,lenByte,(uint8_t *)buff);
+		retn|=SPIFlashRead(addrs,lenByte,byteacessBuff);
+
+		if(retn==0 && memcmp((uint8_t *)buff,byteacessBuff,lenByte)==0)
+		{
+
+			//PRINTF("\n\rBOOTLOADER : Success Write @%d, len=%d, no of retry=%d \n\r",sectorNum,lenByte,(FLASHWRITE_RETRY-retrycnt));
+
+			return SUCCESS;
+		}
+		retrycnt--;//decrement for next try if not success
+	}
+
+
+	PRINTF("\n\rBOOTLOADER : Sector Write SPIFLASH_ERROR @%d sector\n\r",sectorNum);
+
+	return SPIFLASH_ERROR;//write fail on a sector
 }
 
 //#################### Utility function SECTION
