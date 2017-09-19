@@ -55,7 +55,6 @@
 //
 static __RAM_FUNC updateBaseFirmware(void);
 static __RAM_FUNC myFMC_Erase(uint32_t u32addr);
-static __RAM_FUNC myFMC_EraseAll(uint32_t u32addr);
 static __RAM_FUNC FMC_ProgramPage(uint32_t u32startAddr, uint32_t * u32buff);
 void CHECK_AND_SET_FLASH_PROTECTION(void);
 uint8_t writeSPIFlashSector(uint16_t sectorNum, uint16_t lenByte, void* buff);
@@ -232,6 +231,8 @@ void execute_user_code(void)
 	  JumpAddress = *(__IO uint32_t*) (appAddress + 4);
 	  Jump_To_Application = (pFunction) JumpAddress;
 	  /* Initialize user application's Stack Pointer */
+	    // Relocate the vector table
+	    SCB->VTOR = (uint32_t) appAddress;
 	  __set_MSP(*(__IO uint32_t*) appAddress);
 		HAL_DeInit();
 	  Jump_To_Application();
@@ -260,7 +261,8 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  HAL_Delay(100);
+  HAL_Init();
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -282,7 +284,7 @@ int main(void)
 #if ENABLE_BOOTLOADER_PROTECTION
 /* Ensures that the first sector of flash is write-protected preventing that the
 bootloader is overwritten */
-//CHECK_AND_SET_FLASH_PROTECTION();
+CHECK_AND_SET_FLASH_PROTECTION();
 #endif
 
 //HAL_FLASHEx_OBGetConfig(&FlashOBstatus);
